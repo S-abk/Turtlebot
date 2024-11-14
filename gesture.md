@@ -87,3 +87,6 @@ with vision.GestureRecognizer.create_from_options(options) as recognizer:
 - **Frame Processing**: Each frame is captured, converted to RGB, and processed by the recognizer. The results are handled by the callback function.
 
 For more detailed information, refer to the [Gesture Recognition Guide for Python](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/python#live-stream). 
+
+
+[media pipe repo](https://github.com/google-ai-edge/mediapipe-samples/blob/main/examples/gesture_recognizer/python/gesture_recognizer.ipynb)
