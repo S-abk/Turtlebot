@@ -1,64 +1,62 @@
 import cv2
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 
-# Load MediaPipe Tasks for Hand Landmarker
-mp_tasks_vision = mp.tasks.vision
-BaseOptions = mp.tasks.BaseOptions
-HandLandmarker = mp_tasks_vision.HandLandmarker
-HandLandmarkerOptions = mp_tasks_vision.HandLandmarkerOptions
-VisionRunningMode = mp.tasks.vision.RunningMode
+# Initialize OpenCV and MediaPipe Hands
+cap = cv2.VideoCapture(0)
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands()
+mp_drawing = mp.solutions.drawing_utils
 
-# Initialize a global variable to hold the annotated frame
-annotated_frame = None
+# Set up Gesture Recognizer
+BaseOptions = python.BaseOptions
+GestureRecognizer = vision.GestureRecognizer
+GestureRecognizerOptions = vision.GestureRecognizerOptions
+GestureRecognizerResult = vision.GestureRecognizerResult
+VisionRunningMode = vision.RunningMode
 
-# Callback for hand landmark results
-def hand_landmark_result_callback(result, output_image, timestamp_ms):
-    global annotated_frame
-    # Convert output_image to OpenCV format
-    annotated_frame = output_image.numpy_view()
+# Callback to display gesture recognition result
+def print_gesture_result(result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int):
+    if result.gestures:
+        # Print the recognized gesture
+        gesture_label = result.gestures[0][0].category_name
+        print(f"Detected Gesture: {gesture_label}")
+    else:
+        print("No gesture detected.")
 
-    # Draw hand landmarks if detected
-    if result.hand_landmarks:
-        for hand_landmarks in result.hand_landmarks:
-            mp.drawing_utils.draw_landmarks(
-                annotated_frame, hand_landmarks, mp.solutions.hands.HAND_CONNECTIONS,
-                mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
-                mp.solutions.drawing_styles.get_default_hand_connections_style()
-            )
-
-# Initialize Hand Landmarker with live-stream mode and callback
-hand_landmarker_options = HandLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path='hand_landmarker.task'),  # Update with correct model path
+gesture_options = GestureRecognizerOptions(
+    base_options=BaseOptions(model_asset_path='gesture_recognizer.task'),  # Update with correct model path
     running_mode=VisionRunningMode.LIVE_STREAM,
-    result_callback=hand_landmark_result_callback
+    result_callback=print_gesture_result
 )
 
-# Start video capture and initialize the hand landmarker
-with HandLandmarker.create_from_options(hand_landmarker_options) as hand_landmarker:
-    cap = cv2.VideoCapture(0)
+with GestureRecognizer.create_from_options(gesture_options) as recognizer:
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Flip image for a mirror effect
+        # Flip and process the frame for hand landmarks
         frame = cv2.flip(frame, 1)
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = hands.process(image)
 
-        # Use the Hand Landmarker to detect landmarks
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-        timestamp_ms = int(cap.get(cv2.CAP_PROP_POS_MSEC))
-        hand_landmarker.detect_async(mp_image, timestamp_ms)
+        # Draw hand landmarks and prepare gesture recognition input
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
-        # Display the annotated frame if landmarks were drawn, otherwise show the original frame
-        if annotated_frame is not None:
-            cv2.imshow("Hand Landmarks", annotated_frame)
-        else:
-            cv2.imshow("Hand Landmarks", frame)
+            # Convert image to MediaPipe format and recognize gestures
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
+            timestamp_ms = int(cap.get(cv2.CAP_PROP_POS_MSEC))
+            recognizer.recognize_async(mp_image, timestamp_ms)
 
-        # Press 'ESC' to exit
-        if cv2.waitKey(5) & 0xFF == 27:
+        # Display the frame
+        cv2.imshow('Hand Gesture with Landmark and Recognition', frame)
+
+        if cv2.waitKey(10) & 0xFF == ord('q'):
             break
 
-    cap.release()
-    cv2.destroyAllWindows()
+cap.release()
+cv2.destroyAllWindows()
