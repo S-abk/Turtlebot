@@ -1,33 +1,26 @@
 import mediapipe as mp
 import cv2
+import math
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+from mediapipe.framework.formats import landmark_pb2
 
-# Import necessary MediaPipe classes
-BaseOptions = mp.tasks.BaseOptions
-GestureRecognizer = mp.tasks.vision.GestureRecognizer
-GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
-GestureRecognizerResult = mp.tasks.vision.GestureRecognizerResult
-VisionRunningMode = mp.tasks.vision.RunningMode
-DrawingUtils = mp.solutions.drawing_utils
-DrawingStyles = mp.solutions.drawing_styles
+# Import drawing utilities and styles
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
 
-# Callback function to display results with hand landmarks
+# Define the base options for MediaPipe tasks
+BaseOptions = python.BaseOptions
+GestureRecognizer = vision.GestureRecognizer
+GestureRecognizerOptions = vision.GestureRecognizerOptions
+GestureRecognizerResult = vision.GestureRecognizerResult
+VisionRunningMode = vision.RunningMode
+
+# Callback function to process and display results
 def print_result(result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int):
-    # Convert MediaPipe image to OpenCV format
-    output_frame = output_image.numpy_view()
-    
-    # Draw hand landmarks on the frame if they exist
-    if result.hand_landmarks:
-        for hand_landmarks in result.hand_landmarks:
-            DrawingUtils.draw_landmarks(
-                output_frame,
-                hand_landmarks,
-                mp.solutions.hands.HAND_CONNECTIONS,
-                DrawingStyles.get_default_hand_landmarks_style(),
-                DrawingStyles.get_default_hand_connections_style()
-            )
-
-    # Display the frame with landmarks
-    cv2.imshow('Gesture Recognition with Landmarks', output_frame)
+    # Display a placeholder message to confirm that the callback is triggered
+    print("Gesture recognition result:", result)
 
 # Configure GestureRecognizer with live stream mode
 options = GestureRecognizerOptions(
@@ -61,6 +54,9 @@ with GestureRecognizer.create_from_options(options) as recognizer:
 
             # Process the frame with gesture recognizer
             recognizer.recognize_async(mp_image, timestamp_ms)
+
+            # Show the original frame
+            cv2.imshow('Live Camera Feed', frame)
 
             # Exit when ESC is pressed
             if cv2.waitKey(5) & 0xFF == 27:
