@@ -1,54 +1,71 @@
-import cv2
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
+import cv2
 
-def print_result(result, output_image, timestamp_ms):
-    if result.gestures:
-        for gesture in result.gestures[0]:
-            print(f"Gesture recognized: {gesture.category_name} with score {gesture.score:.2f}")
+# Import necessary MediaPipe classes
+BaseOptions = mp.tasks.BaseOptions
+GestureRecognizer = mp.tasks.vision.GestureRecognizer
+GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
+GestureRecognizerResult = mp.tasks.vision.GestureRecognizerResult
+VisionRunningMode = mp.tasks.vision.RunningMode
+DrawingUtils = mp.solutions.drawing_utils
+DrawingStyles = mp.solutions.drawing_styles
 
-# Path to the gesture recognizer model
-model_path = 'gesture_recognizer.task'
+# Callback function to display results with hand landmarks
+def print_result(result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int):
+    # Convert MediaPipe image to OpenCV format
+    output_frame = output_image.numpy_view()
+    
+    # Draw hand landmarks on the frame if they exist
+    if result.hand_landmarks:
+        for hand_landmarks in result.hand_landmarks:
+            DrawingUtils.draw_landmarks(
+                output_frame,
+                hand_landmarks,
+                mp.solutions.hands.HAND_CONNECTIONS,
+                DrawingStyles.get_default_hand_landmarks_style(),
+                DrawingStyles.get_default_hand_connections_style()
+            )
 
-# Base options for the model
-base_options = python.BaseOptions(model_asset_path=model_path)
+    # Display the frame with landmarks
+    cv2.imshow('Gesture Recognition with Landmarks', output_frame)
 
-# Configure the gesture recognizer options
-options = vision.GestureRecognizerOptions(
-    base_options=base_options,
-    running_mode=vision.RunningMode.LIVE_STREAM,
+# Configure GestureRecognizer with live stream mode
+options = GestureRecognizerOptions(
+    base_options=BaseOptions(model_asset_path='gesture_recognizer.task'),  # Update with your model path
+    running_mode=VisionRunningMode.LIVE_STREAM,
     result_callback=print_result
 )
 
-# Create the gesture recognizer
-with vision.GestureRecognizer.create_from_options(options) as recognizer:
-    # Initialize the webcam
+# Start the gesture recognizer with a live camera stream
+with GestureRecognizer.create_from_options(options) as recognizer:
+    # Open the default camera
     cap = cv2.VideoCapture(0)
+    
+    if not cap.isOpened():
+        print("Error: Could not open camera.")
+        exit()
 
-    while cap.isOpened():
-        success, frame = cap.read()
-        if not success:
-            print("Ignoring empty camera frame.")
-            continue
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                print("Failed to capture frame.")
+                break
 
-        # Convert the frame to RGB
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Convert frame to RGB as MediaPipe requires RGB format
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Create a MediaPipe Image object
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            # Wrap the frame for MediaPipe input and use timestamp
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            timestamp_ms = int(cap.get(cv2.CAP_PROP_POS_MSEC))
 
-        # Get the current timestamp in milliseconds
-        frame_timestamp_ms = int(cap.get(cv2.CAP_PROP_POS_MSEC))
+            # Process the frame with gesture recognizer
+            recognizer.recognize_async(mp_image, timestamp_ms)
 
-        # Send the image to the gesture recognizer
-        recognizer.recognize_async(mp_image, frame_timestamp_ms)
-
-        # Display the frame
-        cv2.imshow('Gesture Recognition', frame)
-
-        if cv2.waitKey(5) & 0xFF == 27:
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
+            # Exit when ESC is pressed
+            if cv2.waitKey(5) & 0xFF == 27:
+                break
+    finally:
+        # Release the capture and close windows
+        cap.release()
+        cv2.destroyAllWindows()
