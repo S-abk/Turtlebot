@@ -1,0 +1,5 @@
+# Automatically created by mypy
+.mypy_cache/
+
+#ignore virtual environment
+venv/
