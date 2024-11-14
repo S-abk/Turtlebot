@@ -17,10 +17,25 @@ GestureRecognizerOptions = vision.GestureRecognizerOptions
 GestureRecognizerResult = vision.GestureRecognizerResult
 VisionRunningMode = vision.RunningMode
 
+# Initialize a global variable to hold the frame for drawing
+annotated_frame = None
+
 # Callback function to process and display results
 def print_result(result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int):
-    # Display a placeholder message to confirm that the callback is triggered
-    print("Gesture recognition result:", result)
+    global annotated_frame
+    # Convert MediaPipe image to OpenCV format for display
+    annotated_frame = output_image.numpy_view()
+
+    # Draw hand landmarks on the frame if they exist
+    if result.hand_landmarks:
+        for hand_landmarks in result.hand_landmarks:
+            mp_drawing.draw_landmarks(
+                annotated_frame,
+                hand_landmarks,
+                mp_hands.HAND_CONNECTIONS,
+                mp_drawing_styles.get_default_hand_landmarks_style(),
+                mp_drawing_styles.get_default_hand_connections_style()
+            )
 
 # Configure GestureRecognizer with live stream mode
 options = GestureRecognizerOptions(
@@ -55,8 +70,11 @@ with GestureRecognizer.create_from_options(options) as recognizer:
             # Process the frame with gesture recognizer
             recognizer.recognize_async(mp_image, timestamp_ms)
 
-            # Show the original frame
-            cv2.imshow('Live Camera Feed', frame)
+            # Display the annotated frame if landmarks were drawn, otherwise show the original frame
+            if annotated_frame is not None:
+                cv2.imshow('Gesture Recognition with Landmarks', annotated_frame)
+            else:
+                cv2.imshow('Gesture Recognition with Landmarks', frame)
 
             # Exit when ESC is pressed
             if cv2.waitKey(5) & 0xFF == 27:
